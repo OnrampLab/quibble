@@ -19,10 +19,10 @@
  *
  *  THE LOOP this enables:
  *    1. You (the AI) generate an HTML document/mockup and include the tag above.
- *    2. The human opens it; a floating "Element" / "Feedback" bar appears
- *       bottom-right. They select text (-> "Comment") or click "Element" then
- *       click any node, and leave comments. Comments highlight and persist in
- *       localStorage, surviving reloads (they re-anchor automatically).
+ *    2. The human opens it; a floating "Feedback" button appears bottom-right.
+ *       They select text (-> "Comment") or, inside the Feedback panel header,
+ *       flip the picking switch and click any node, then leave comments. Comments
+ *       highlight and persist in localStorage, surviving reloads (re-anchor auto).
  *    3. The human clicks "Copy JSON" (or "Export") and pastes the result back
  *       to you as structured feedback. Revise the HTML accordingly, and repeat.
  *
@@ -69,11 +69,13 @@
  *  THEMING (optional): override --quibble-* CSS variables on :root to match the
  *  page's design (e.g. --quibble-accent, --quibble-surface, --quibble-font).
  *
- *  SETTINGS (since v1.1): a gear button on the bar opens a config panel where the
- *  human can set the default mode on load (Off / Element), the export format
- *  (JSON / YAML / Markdown — Copy and Export both follow it), theme colors/font,
- *  and the project / storage-key. Preferences persist in localStorage; defaults
- *  reproduce the original behavior, so JSON stays the default export.
+ *  SETTINGS (since v1.1): a gear button in the Feedback panel header opens a config
+ *  panel where the human can set the default mode on load (Off / Element), the
+ *  export format (JSON / YAML / Markdown — Copy and Export both follow it), theme
+ *  colors/font, and the project / storage-key. Element picking is sticky — once
+ *  armed (switch, or default mode = Element) it stays armed after each pick until
+ *  Esc. Preferences persist in localStorage; defaults reproduce the original
+ *  behavior, so JSON stays the default export.
  *
  *  Internals: text highlighting uses the CSS Custom Highlight API (handles
  *  multi-element ranges) with a <mark> fallback; element comments draw a
@@ -203,6 +205,13 @@
     ".qb-field .qb-row2{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}" +
     ".qb-field input[type=color]{width:34px;height:30px;padding:0;border:1px solid var(--quibble-border-panel,rgba(0,0,0,.15));border-radius:6px;background:transparent;cursor:pointer;}" +
     ".qb-field .hint{font-size:11px;color:var(--quibble-muted,#6b7280);margin:5px 0 0;}" +
+    ".qb-head-actions{display:flex;align-items:center;gap:6px;}" +
+    ".qb-switch{display:inline-flex;align-items:center;gap:5px;padding:3px;background:transparent;border:none;cursor:pointer;color:inherit;}" +
+    ".qb-switch.qb-on{color:var(--quibble-accent,#eab308);}" +
+    ".qb-switch .qb-track{position:relative;width:30px;height:16px;border-radius:999px;background:var(--quibble-border-panel,rgba(0,0,0,.22));transition:background .15s;}" +
+    ".qb-switch.qb-on .qb-track{background:var(--quibble-accent,#eab308);}" +
+    ".qb-switch .qb-knob{position:absolute;top:2px;left:2px;width:12px;height:12px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.35);transition:left .15s;}" +
+    ".qb-switch.qb-on .qb-knob{left:16px;}" +
     "@media (prefers-color-scheme: dark){.qb-panel{--quibble-panel:#1f1f1f;--quibble-on-panel:#f3f4f6;--quibble-border-panel:rgba(255,255,255,.14);}}";
   document.head.appendChild(style);
 
@@ -330,8 +339,12 @@
   function flashRing(id) { var r = rings[id]; if (r) { r.node.classList.add("qb-flash"); setTimeout(function () { r.node.classList.remove("qb-flash"); }, 1400); } }
 
   /* ------------------------------------------------------------- Transients */
-  var bubble, composer, panel, configPanel, bar, fab, pickBtn, hoverBox, picking = false;
-  function clearTransient() { if (bubble) { bubble.remove(); bubble = null; } if (composer) { composer.remove(); composer = null; } }
+  var bubble, composer, composerTarget, panel, configPanel, bar, fab, hoverBox, picking = false;
+  function clearTransient() { if (bubble) { bubble.remove(); bubble = null; } if (composer) { composer.remove(); composer = null; } composerTarget = null; }
+  /* The single "user dismissed the composer" path (Cancel, Save, or a click
+     outside it). Re-arms element picking when an element composer closes — see
+     reArmPick — so picking stays sticky however the composer is closed. */
+  function dismissComposer() { var ct = composerTarget; clearTransient(); if (ct) reArmPick(ct); }
 
   /* ----------------------------------------------------- Text selection flow */
   document.addEventListener("mouseup", function (e) {
@@ -340,7 +353,7 @@
     setTimeout(function () {
       var sel = window.getSelection();
       var text = sel && sel.toString().trim();
-      if (!text || text.length < 2) { clearTransient(); return; }
+      if (!text || text.length < 2) { dismissComposer(); return; }
       var range = sel.getRangeAt(0).cloneRange();
       showBubble(range.getBoundingClientRect(), { type: "text", quote: text, range: range, anchorNode: sel.anchorNode });
     }, 1);
@@ -362,7 +375,7 @@
     picking = on;
     document.body.classList.toggle("qb-picking", on);
     if (fab) fab.classList.toggle("qb-on", false);
-    if (pickBtn) { pickBtn.classList.toggle("qb-on", on); pickBtn.innerHTML = ICON.cursor + (on ? " Click an element…" : " Element"); }
+    if (panel) { var sw = panel.querySelector("[data-mode-toggle]"); if (sw) { sw.classList.toggle("qb-on", on); sw.setAttribute("aria-checked", on ? "true" : "false"); } }
     if (on) {
       clearTransient();
       document.addEventListener("mousemove", onPickMove, true);
@@ -394,6 +407,14 @@
     showComposer(rect, { type: "element", el: el, selector: computeSelector(el), tag: el.tagName.toLowerCase(), snippet: elementSnippet(el) });
   }
 
+  /* Element picking is sticky: once armed, stay armed after each pick (save or
+     cancel) instead of dropping back to text selection — keep going until the
+     human presses Esc or toggles the switch off. Deferred a tick so the closing
+     click isn't caught by the freshly-attached pick listener. */
+  function reArmPick(target) {
+    if (target.type === "element") setTimeout(function () { setPicking(true); }, 0);
+  }
+
   /* ---------------------------------------------------------------- Composer */
   function showComposer(rect, target) {
     clearTransient();
@@ -408,14 +429,15 @@
       '<textarea placeholder="Your feedback on this…"></textarea>' +
       '<div class="qb-row"><button class="qb-btn qb-cancel">Cancel</button><button class="qb-btn pri qb-save">Save</button></div>';
     document.body.appendChild(composer);
+    composerTarget = target;
     var ta = composer.querySelector("textarea"); ta.focus();
-    composer.querySelector(".qb-cancel").addEventListener("click", clearTransient);
+    composer.querySelector(".qb-cancel").addEventListener("click", dismissComposer);
     composer.querySelector(".qb-save").addEventListener("click", function () {
       var val = ta.value.trim();
       if (!val) { ta.focus(); return; }
       addComment(target, val);
-      clearTransient();
       window.getSelection().removeAllRanges();
+      dismissComposer();
     });
     ta.addEventListener("keydown", function (e) { if ((e.metaKey || e.ctrlKey) && e.key === "Enter") composer.querySelector(".qb-save").click(); });
   }
@@ -438,16 +460,10 @@
   function renderFab() {
     if (!bar) {
       bar = document.createElement("div"); bar.className = "qb-bar";
-      pickBtn = document.createElement("button"); pickBtn.className = "qb-fab";
-      pickBtn.addEventListener("click", function () { setPicking(!picking); });
       fab = document.createElement("button"); fab.className = "qb-fab";
       fab.addEventListener("click", togglePanel);
-      var cfgBtn = document.createElement("button"); cfgBtn.className = "qb-fab"; cfgBtn.title = "Settings";
-      cfgBtn.innerHTML = ICON.gear;
-      cfgBtn.addEventListener("click", toggleConfig);
-      bar.appendChild(pickBtn); bar.appendChild(fab); bar.appendChild(cfgBtn);
+      bar.appendChild(fab);
       document.body.appendChild(bar);
-      pickBtn.innerHTML = ICON.cursor + " Element";
     }
     var n = load().length;
     fab.innerHTML = ICON.messages + " Feedback" + (n ? " · " + n : "");
@@ -455,6 +471,7 @@
 
   function togglePanel() {
     if (panel) { panel.remove(); panel = null; return; }
+    if (configPanel) { configPanel.remove(); configPanel = null; } /* share one corner */
     panel = document.createElement("div"); panel.className = "qb-panel";
     renderPanel();
     document.body.appendChild(panel);
@@ -474,8 +491,8 @@
       '<header><span>Settings</span><button class="qb-btn" data-close>×</button></header>' +
       '<div class="qb-list">' +
         '<div class="qb-field"><label>Default mode on load</label>' +
-          '<select data-mode>' + opt("off", settings.defaultMode, "Off — click Element to start") + opt("element", settings.defaultMode, "Element — pick mode armed on load") + '</select>' +
-          '<p class="hint">Element mode intercepts clicks for commenting until you press Esc.</p></div>' +
+          '<select data-mode>' + opt("off", settings.defaultMode, "Off — text selection") + opt("element", settings.defaultMode, "Element — pick mode armed on load") + '</select>' +
+          '<p class="hint">Element mode intercepts clicks for commenting until you press Esc. Toggle it any time with the switch in the Feedback panel header.</p></div>' +
         '<div class="qb-field"><label>Export format</label>' +
           '<select data-fmt>' + opt("json", settings.exportFormat, "JSON") + opt("yaml", settings.exportFormat, "YAML") + opt("markdown", settings.exportFormat, "Markdown") + '</select>' +
           '<p class="hint">Applies to both Copy and Export.</p></div>' +
@@ -532,12 +549,19 @@
         '<p class="cm">' + esc(c.comment) + "</p>" +
         (orphan ? '<p class="qb-orphan-note">⚠ target not found on this page</p>' : "") +
         '<div class="qb-row"><button class="qb-btn" data-del="' + c.id + '">Delete</button></div></div>';
-    }).join("") : '<p class="qb-empty">No comments yet. Select text, or click “Element” then click something.</p>';
+    }).join("") : '<p class="qb-empty">No comments yet. Select text, or flip the ⌖ switch above and click an element.</p>';
     panel.innerHTML =
-      "<header><span>Feedback · " + all.length + '</span><button class="qb-btn" data-close>×</button></header>' +
+      "<header><span>Feedback · " + all.length + '</span><span class="qb-head-actions">' +
+        '<button class="qb-switch' + (picking ? " qb-on" : "") + '" data-mode-toggle role="switch" aria-checked="' + (picking ? "true" : "false") + '" title="Element picking — off picks text">' +
+          ICON.cursor + '<span class="qb-track"><span class="qb-knob"></span></span></button>' +
+        '<button class="qb-btn" data-config title="Settings">' + ICON.gear + '</button>' +
+        '<button class="qb-btn" data-close>×</button>' +
+      "</span></header>" +
       '<div class="qb-list">' + items + "</div>" +
       '<div class="qb-foot"><button class="qb-btn pri" data-copy style="flex:1;">' + ICON.copy + ' Copy ' + (FMT[settings.exportFormat] || FMT.json).label + '</button><button class="qb-btn" data-export>' + ICON.download + " Export</button><button class=\"qb-btn\" data-clear>Clear</button></div>";
     panel.querySelector("[data-close]").addEventListener("click", togglePanel);
+    panel.querySelector("[data-mode-toggle]").addEventListener("click", function () { setPicking(!picking); });
+    panel.querySelector("[data-config]").addEventListener("click", function () { togglePanel(); toggleConfig(); });
     panel.querySelector("[data-export]").addEventListener("click", exportData);
     panel.querySelector("[data-copy]").addEventListener("click", function () { copyData(this); });
     panel.querySelector("[data-clear]").addEventListener("click", function () { if (confirm("Delete all feedback comments?")) clearAll(); });
