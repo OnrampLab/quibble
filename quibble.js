@@ -69,6 +69,12 @@
  *  THEMING (optional): override --quibble-* CSS variables on :root to match the
  *  page's design (e.g. --quibble-accent, --quibble-surface, --quibble-font).
  *
+ *  SETTINGS (since v1.1): a gear button on the bar opens a config panel where the
+ *  human can set the default mode on load (Off / Element), the export format
+ *  (JSON / YAML / Markdown — Copy and Export both follow it), theme colors/font,
+ *  and the project / storage-key. Preferences persist in localStorage; defaults
+ *  reproduce the original behavior, so JSON stays the default export.
+ *
  *  Internals: text highlighting uses the CSS Custom Highlight API (handles
  *  multi-element ranges) with a <mark> fallback; element comments draw a
  *  positioned ring. If a target no longer exists after you regenerate the page,
@@ -85,16 +91,48 @@
       var s = document.querySelectorAll('script[src*="quibble"]');
       return s[s.length - 1] || null;
     })();
+  var attrProject = (script && script.getAttribute("data-project")) || "untitled";
+  var attrKey = (script && script.getAttribute("data-storage-key")) || null;
+  var lsGet = function (k) { try { return localStorage.getItem(k); } catch (e) { return null; } };
+  var lsSet = function (k, v) { try { localStorage.setItem(k, v); } catch (e) {} };
+
+  /* baseId is derived from the script tag and never changes at runtime, so it is a
+     stable home for settings + any project/key override set from the config panel. */
+  var baseId = attrKey || "quibble:" + attrProject;
+  var override = (function () { try { return JSON.parse(lsGet(baseId + ":cfg")) || {}; } catch (e) { return {}; } })();
   var cfg = {
-    project: (script && script.getAttribute("data-project")) || "untitled",
-    storageKey: script && script.getAttribute("data-storage-key")
+    project: override.project || attrProject,
+    storageKey: override.storageKey || attrKey
   };
   var KEY = cfg.storageKey || "quibble:" + cfg.project;
   var JKEY = KEY + ":jump";
+  var SKEY = baseId + ":settings";
+
+  /* ------------------------------------------------------------- Settings */
+  /* Defaults reproduce pre-1.1 behavior exactly, so existing pages are unchanged
+     until someone opts in via the config panel. Persisted under SKEY. */
+  var settings = (function () {
+    var s; try { s = JSON.parse(lsGet(SKEY)) || {}; } catch (e) { s = {}; }
+    return { defaultMode: s.defaultMode || "off", exportFormat: s.exportFormat || "json", theme: s.theme || {} };
+  })();
+  var saveSettings = function () { lsSet(SKEY, JSON.stringify(settings)); };
+  var THEME_VARS = { accent: "--quibble-accent", surface: "--quibble-surface", font: "--quibble-font" };
+  function applyTheme(t) {
+    t = t || {};
+    for (var k in THEME_VARS) {
+      if (t[k]) document.documentElement.style.setProperty(THEME_VARS[k], t[k]);
+      else document.documentElement.style.removeProperty(THEME_VARS[k]);
+    }
+  }
+  var FMT = {
+    json: { ext: "json", mime: "application/json", label: "JSON" },
+    yaml: { ext: "yaml", mime: "text/yaml", label: "YAML" },
+    markdown: { ext: "md", mime: "text/markdown", label: "Markdown" }
+  };
 
   /* -------------------------------------------------------------- Storage */
-  var load = function () { try { return JSON.parse(localStorage.getItem(KEY)) || []; } catch (e) { return []; } };
-  var save = function (a) { try { localStorage.setItem(KEY, JSON.stringify(a)); } catch (e) {} };
+  var load = function () { try { return JSON.parse(lsGet(KEY)) || []; } catch (e) { return []; } };
+  var save = function (a) { lsSet(KEY, JSON.stringify(a)); };
   var pageId = function () { return (location.pathname.split("/").pop() || "index.html") + location.search; };
   var uid = function () { return "q_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); };
   var nowIso = function () { return new Date().toISOString(); };
@@ -112,7 +150,8 @@
     cursor: svg('<path d="M4 4l7 16 2.5-6.5L20 11 4 4z"/>'),
     download: svg('<path d="M12 3v12M7 11l5 5 5-5M4 21h16"/>'),
     copy: svg('<rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h8"/>'),
-    check: svg('<path d="M5 12l5 5L20 7"/>')
+    check: svg('<path d="M5 12l5 5L20 7"/>'),
+    gear: svg('<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>')
   };
 
   /* ---------------------------------------------------------------- Styles */
@@ -155,6 +194,15 @@
     ".qb-orphan-note{font-size:11px;color:var(--quibble-muted,#9ca3af);margin-top:4px;}" +
     ".qb-foot{display:flex;gap:8px;padding:10px 12px;border-top:1px solid var(--quibble-border-panel,rgba(0,0,0,.1));}" +
     ".qb-empty{color:var(--quibble-muted,#9ca3af);font-size:13px;text-align:center;padding:22px 8px;}" +
+    ".qb-config{right:18px;bottom:64px;width:300px;max-height:70vh;display:flex;flex-direction:column;}" +
+    ".qb-config .qb-list{padding:14px;}" +
+    ".qb-field{margin-bottom:16px;}" +
+    ".qb-field:last-child{margin-bottom:4px;}" +
+    ".qb-field>label{display:block;font-size:12px;font-weight:600;margin-bottom:6px;}" +
+    ".qb-field select,.qb-field input[type=text]{width:100%;box-sizing:border-box;font:13px var(--quibble-font,system-ui,sans-serif);padding:6px 8px;border:1px solid var(--quibble-border-panel,rgba(0,0,0,.15));border-radius:7px;background:transparent;color:inherit;}" +
+    ".qb-field .qb-row2{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}" +
+    ".qb-field input[type=color]{width:34px;height:30px;padding:0;border:1px solid var(--quibble-border-panel,rgba(0,0,0,.15));border-radius:6px;background:transparent;cursor:pointer;}" +
+    ".qb-field .hint{font-size:11px;color:var(--quibble-muted,#6b7280);margin:5px 0 0;}" +
     "@media (prefers-color-scheme: dark){.qb-panel{--quibble-panel:#1f1f1f;--quibble-on-panel:#f3f4f6;--quibble-border-panel:rgba(255,255,255,.14);}}";
   document.head.appendChild(style);
 
@@ -282,7 +330,7 @@
   function flashRing(id) { var r = rings[id]; if (r) { r.node.classList.add("qb-flash"); setTimeout(function () { r.node.classList.remove("qb-flash"); }, 1400); } }
 
   /* ------------------------------------------------------------- Transients */
-  var bubble, composer, panel, bar, fab, pickBtn, hoverBox, picking = false;
+  var bubble, composer, panel, configPanel, bar, fab, pickBtn, hoverBox, picking = false;
   function clearTransient() { if (bubble) { bubble.remove(); bubble = null; } if (composer) { composer.remove(); composer = null; } }
 
   /* ----------------------------------------------------- Text selection flow */
@@ -394,7 +442,10 @@
       pickBtn.addEventListener("click", function () { setPicking(!picking); });
       fab = document.createElement("button"); fab.className = "qb-fab";
       fab.addEventListener("click", togglePanel);
-      bar.appendChild(pickBtn); bar.appendChild(fab);
+      var cfgBtn = document.createElement("button"); cfgBtn.className = "qb-fab"; cfgBtn.title = "Settings";
+      cfgBtn.innerHTML = ICON.gear;
+      cfgBtn.addEventListener("click", toggleConfig);
+      bar.appendChild(pickBtn); bar.appendChild(fab); bar.appendChild(cfgBtn);
       document.body.appendChild(bar);
       pickBtn.innerHTML = ICON.cursor + " Element";
     }
@@ -407,6 +458,58 @@
     panel = document.createElement("div"); panel.className = "qb-panel";
     renderPanel();
     document.body.appendChild(panel);
+  }
+
+  /* ------------------------------------------------------------ Config panel */
+  function toggleConfig() {
+    if (configPanel) { configPanel.remove(); configPanel = null; return; }
+    configPanel = document.createElement("div"); configPanel.className = "qb-panel qb-config";
+    renderConfig();
+    document.body.appendChild(configPanel);
+  }
+  function opt(val, cur, label) { return '<option value="' + val + '"' + (cur === val ? " selected" : "") + ">" + label + "</option>"; }
+  function renderConfig() {
+    var t = settings.theme || {};
+    configPanel.innerHTML =
+      '<header><span>Settings</span><button class="qb-btn" data-close>×</button></header>' +
+      '<div class="qb-list">' +
+        '<div class="qb-field"><label>Default mode on load</label>' +
+          '<select data-mode>' + opt("off", settings.defaultMode, "Off — click Element to start") + opt("element", settings.defaultMode, "Element — pick mode armed on load") + '</select>' +
+          '<p class="hint">Element mode intercepts clicks for commenting until you press Esc.</p></div>' +
+        '<div class="qb-field"><label>Export format</label>' +
+          '<select data-fmt>' + opt("json", settings.exportFormat, "JSON") + opt("yaml", settings.exportFormat, "YAML") + opt("markdown", settings.exportFormat, "Markdown") + '</select>' +
+          '<p class="hint">Applies to both Copy and Export.</p></div>' +
+        '<div class="qb-field"><label>Theme</label>' +
+          '<div class="qb-row2">' +
+            '<input type="color" data-theme="accent" value="' + esc(t.accent || "#eab308") + '"><span class="hint" style="margin:0">Accent</span>' +
+            '<input type="color" data-theme="surface" value="' + esc(t.surface || "#1a1a1a") + '"><span class="hint" style="margin:0">Bar</span></div>' +
+          '<input type="text" data-theme="font" placeholder="Font family, e.g. Inter, system-ui" value="' + esc(t.font || "") + '" style="margin-top:8px">' +
+          '<div class="qb-row" style="margin-top:8px"><button class="qb-btn" data-theme-reset>Reset theme</button></div></div>' +
+        '<div class="qb-field"><label>Project</label>' +
+          '<input type="text" data-qb-project value="' + esc(cfg.project) + '">' +
+          '<input type="text" data-qb-skey placeholder="storage key (advanced)" value="' + esc(cfg.storageKey || "") + '" style="margin-top:8px">' +
+          '<p class="hint">Switches which comments are shown; saving reloads the page.</p>' +
+          '<div class="qb-row" style="margin-top:8px"><button class="qb-btn pri" data-save-id>Save &amp; reload</button></div></div>' +
+      '</div>';
+    configPanel.querySelector("[data-close]").addEventListener("click", toggleConfig);
+    configPanel.querySelector("[data-mode]").addEventListener("change", function () { settings.defaultMode = this.value; saveSettings(); });
+    configPanel.querySelector("[data-fmt]").addEventListener("change", function () { settings.exportFormat = this.value; saveSettings(); if (panel) renderPanel(); });
+    [].forEach.call(configPanel.querySelectorAll("[data-theme]"), function (inp) {
+      inp.addEventListener("input", function () {
+        var key = inp.getAttribute("data-theme"), v = inp.value.trim();
+        settings.theme = settings.theme || {};
+        if (v) settings.theme[key] = v; else delete settings.theme[key];
+        saveSettings(); applyTheme(settings.theme);
+      });
+    });
+    configPanel.querySelector("[data-theme-reset]").addEventListener("click", function () { settings.theme = {}; saveSettings(); applyTheme({}); renderConfig(); });
+    configPanel.querySelector("[data-save-id]").addEventListener("click", function () {
+      var np = configPanel.querySelector("[data-qb-project]").value.trim() || "untitled";
+      var nk = configPanel.querySelector("[data-qb-skey]").value.trim();
+      var ov = {}; if (np !== attrProject) ov.project = np; if (nk) ov.storageKey = nk;
+      lsSet(baseId + ":cfg", JSON.stringify(ov));
+      location.reload();
+    });
   }
 
   function isOrphan(c) {
@@ -433,10 +536,10 @@
     panel.innerHTML =
       "<header><span>Feedback · " + all.length + '</span><button class="qb-btn" data-close>×</button></header>' +
       '<div class="qb-list">' + items + "</div>" +
-      '<div class="qb-foot"><button class="qb-btn pri" data-copy style="flex:1;">' + ICON.copy + ' Copy JSON</button><button class="qb-btn" data-export>' + ICON.download + " Export</button><button class=\"qb-btn\" data-clear>Clear</button></div>";
+      '<div class="qb-foot"><button class="qb-btn pri" data-copy style="flex:1;">' + ICON.copy + ' Copy ' + (FMT[settings.exportFormat] || FMT.json).label + '</button><button class="qb-btn" data-export>' + ICON.download + " Export</button><button class=\"qb-btn\" data-clear>Clear</button></div>";
     panel.querySelector("[data-close]").addEventListener("click", togglePanel);
-    panel.querySelector("[data-export]").addEventListener("click", exportJSON);
-    panel.querySelector("[data-copy]").addEventListener("click", function () { copyJSON(this); });
+    panel.querySelector("[data-export]").addEventListener("click", exportData);
+    panel.querySelector("[data-copy]").addEventListener("click", function () { copyData(this); });
     panel.querySelector("[data-clear]").addEventListener("click", function () { if (confirm("Delete all feedback comments?")) clearAll(); });
     [].forEach.call(panel.querySelectorAll("[data-del]"), function (b) {
       b.addEventListener("click", function (e) { e.stopPropagation(); deleteOne(b.getAttribute("data-del")); });
@@ -455,13 +558,68 @@
 
   /* ---------------------------------------------------------------- Export */
   function payload() { return { tool: "quibble", project: cfg.project, exportedAt: nowIso(), count: load().length, quibbles: load() }; }
-  function exportJSON() {
-    var blob = new Blob([JSON.stringify(payload(), null, 2)], { type: "application/json" });
-    var a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = "quibble-" + cfg.project + ".json";
+
+  /* JSON is the canonical shape; YAML/Markdown re-serialize the same payload with
+     no dependency (quibble stays zero-dep). */
+  function repeatStr(s, n) { var o = ""; for (var i = 0; i < n; i++) o += s; return o; }
+  function yamlInline(v) {
+    if (v === null || v === undefined) return "null";
+    if (typeof v === "number" || typeof v === "boolean") return String(v);
+    return '"' + String(v).replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/\r/g, "").replace(/\n/g, "\\n").replace(/\t/g, "\\t") + '"';
+  }
+  function yamlBlock(value, indent) {
+    var pad = repeatStr("  ", indent), out = [];
+    if (Array.isArray(value)) {
+      if (!value.length) return pad + "[]";
+      value.forEach(function (item) {
+        if (item && typeof item === "object") {
+          var inner = yamlBlock(item, indent + 1).split("\n");
+          out.push(pad + "- " + inner[0].slice((indent + 1) * 2));
+          for (var k = 1; k < inner.length; k++) out.push(inner[k]);
+        } else { out.push(pad + "- " + yamlInline(item)); }
+      });
+      return out.join("\n");
+    }
+    var keys = Object.keys(value);
+    if (!keys.length) return pad + "{}";
+    keys.forEach(function (key) {
+      var v = value[key], nested = v && typeof v === "object";
+      if (nested && (Array.isArray(v) ? v.length : Object.keys(v).length)) {
+        out.push(pad + key + ":"); out.push(yamlBlock(v, indent + 1));
+      } else if (nested) {
+        out.push(pad + key + ": " + (Array.isArray(v) ? "[]" : "{}"));
+      } else {
+        out.push(pad + key + ": " + yamlInline(v));
+      }
+    });
+    return out.join("\n");
+  }
+  function toYaml(p) { return yamlBlock(p, 0) + "\n"; }
+  function toMarkdown(p) {
+    var lines = ["# " + (p.project || "quibble"), "", "_" + p.count + " comment" + (p.count === 1 ? "" : "s") + " · exported " + p.exportedAt + "_", ""];
+    p.quibbles.forEach(function (c, i) {
+      var t = c.target || {}, loc = (c.page || "") + (c.section ? " · " + c.section : "");
+      lines.push("## " + (i + 1) + ". " + (loc || "comment"));
+      if (t.type === "element") lines.push("- **Element:** `<" + t.tag + ">` " + (t.snippet || ""));
+      else lines.push("- **Text:** “" + (t.quote || "") + "”");
+      lines.push("- **Comment:** " + (c.comment || ""), "");
+    });
+    return lines.join("\n");
+  }
+  function serialize() {
+    var p = payload();
+    if (settings.exportFormat === "yaml") return toYaml(p);
+    if (settings.exportFormat === "markdown") return toMarkdown(p);
+    return JSON.stringify(p, null, 2);
+  }
+  function exportData() {
+    var fmt = FMT[settings.exportFormat] || FMT.json;
+    var blob = new Blob([serialize()], { type: fmt.mime });
+    var a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = "quibble-" + cfg.project + "." + fmt.ext;
     document.body.appendChild(a); a.click(); a.remove(); setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
   }
-  function copyJSON(btn) {
-    var txt = JSON.stringify(payload(), null, 2);
+  function copyData(btn) {
+    var txt = serialize();
     var done = function () { var o = btn.innerHTML; btn.innerHTML = ICON.check + " Copied"; setTimeout(function () { btn.innerHTML = o; }, 1200); };
     if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(txt).then(done, function () { fallbackCopy(txt); done(); });
     else { fallbackCopy(txt); done(); }
@@ -493,7 +651,9 @@
     if (jid) { try { localStorage.removeItem(JKEY); } catch (e) {} setTimeout(function () { jumpTo(jid); }, 120); }
   }
 
+  applyTheme(settings.theme);
   renderFab();
+  if (settings.defaultMode === "element") setTimeout(function () { setPicking(true); }, 0);
   if (document.readyState === "complete") setTimeout(reapply, 80);
   else window.addEventListener("load", function () { setTimeout(reapply, 80); });
 })();
