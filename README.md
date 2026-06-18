@@ -36,16 +36,18 @@ Or self-host: drop `quibble.js` next to your HTML and
 | `data-project`     | `untitled`           | Names the project; appears in the exported JSON.   |
 | `data-storage-key` | `quibble:<project>`  | Override the `localStorage` namespace.             |
 
-A floating **Element** / **Feedback** bar appears in the bottom-right corner.
+A floating **Feedback** button appears in the bottom-right corner; element picking
+and settings live inside its panel header.
 
 ## Release candidate — v1.1 (config panel)
 
 > ⚠️ **Pre-release.** `@v1` stays on the current stable build until this is promoted.
 
-A **Settings** panel (⚙ gear on the bar) is in testing. It adds, all persisted in
-`localStorage`:
+A **Settings** panel (⚙ gear in the **Feedback** panel header) is in testing. It
+adds, all persisted in `localStorage`:
 
-- **Default mode on load** — arm **Element** picking automatically ([#2](https://github.com/OnrampLab/quibble/issues/2)).
+- **Element picking switch** — a ⌖ toggle in the Feedback panel header arms element picking; it's **sticky** — stays armed after each pick until <kbd>Esc</kbd>.
+- **Default mode on load** — set **Element** to arm that switch automatically on every load ([#2](https://github.com/OnrampLab/quibble/issues/2)).
 - **Export format** — **JSON**, **YAML**, or **Markdown**; Copy and Export both follow it ([#1](https://github.com/OnrampLab/quibble/issues/1)).
 - **Theme** — accent / bar colors and font.
 - **Project / storage key** — rename or re-namespace without touching the script tag.
@@ -63,8 +65,9 @@ Or pin the release candidate yourself (defaults match `@v1`, so JSON stays defau
 
 - **Comment on text:** select any text → click **Comment** → type → **Save**.
   (Cmd/Ctrl+Enter saves.)
-- **Comment on an element:** click **Element** in the bar, then click any element
-  on the page (image, button, card…). Press **Esc** to cancel.
+- **Comment on an element:** open **Feedback** and flip the **⌖ picking switch**
+  in the header (left of the gear), then click any element on the page (image,
+  button, card…). Press **Esc** to stop picking.
 - **Review:** click **Feedback** to open the panel — jump to a comment, delete it,
   **Copy JSON**, **Export** to a file, or **Clear** all.
 
