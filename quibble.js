@@ -165,17 +165,22 @@
     "::highlight(quibble-flash){background-color:var(--quibble-highlight-flash,rgba(234,179,8,.6));}" +
     "mark.qb-hl{background:var(--quibble-highlight,rgba(234,179,8,.28));color:inherit;}" +
     "mark.qb-hl.qb-flash{background:var(--quibble-highlight-flash,rgba(234,179,8,.6));}" +
-    ".qb-ring{position:fixed;z-index:2147482000;pointer-events:none;border:2px solid var(--quibble-accent,#eab308);border-radius:4px;box-shadow:0 0 0 2px rgba(234,179,8,.18);transition:box-shadow .15s;}" +
+    /* z-indexes sit just below the max int so quibble's surfaces win against
+       overlay-based modals (which use ordinary high z-index values). Modal
+       <dialog>/fullscreen top-layer modals ignore z-index entirely and are
+       handled by hosting qbRoot inside them instead — see "Top-layer host". */
+    ".qb-root{display:contents;}" +
+    ".qb-ring{position:fixed;z-index:2147483641;pointer-events:none;border:2px solid var(--quibble-accent,#eab308);border-radius:4px;box-shadow:0 0 0 2px rgba(234,179,8,.18);transition:box-shadow .15s;}" +
     ".qb-ring.qb-orphan{border-color:var(--quibble-muted,#9ca3af);border-style:dashed;box-shadow:none;}" +
     ".qb-ring.qb-flash{box-shadow:0 0 0 4px rgba(234,179,8,.45);}" +
-    ".qb-hover{position:fixed;z-index:2147482000;pointer-events:none;border:2px dashed var(--quibble-accent,#eab308);border-radius:4px;background:rgba(234,179,8,.08);}" +
+    ".qb-hover{position:fixed;z-index:2147483641;pointer-events:none;border:2px dashed var(--quibble-accent,#eab308);border-radius:4px;background:rgba(234,179,8,.08);}" +
     "body.qb-picking,body.qb-picking *{cursor:crosshair!important;}" +
-    ".qb-bar{position:fixed;right:18px;bottom:18px;z-index:2147483000;display:flex;gap:8px;font:500 13px var(--quibble-font,system-ui,-apple-system,sans-serif);}" +
+    ".qb-bar{position:fixed;right:18px;bottom:18px;z-index:2147483645;display:flex;gap:8px;font:500 13px var(--quibble-font,system-ui,-apple-system,sans-serif);}" +
     ".qb-fab{display:inline-flex;align-items:center;gap:7px;padding:9px 13px;border-radius:999px;border:1px solid var(--quibble-border,rgba(255,255,255,.12));background:var(--quibble-surface,#1a1a1a);color:var(--quibble-on-surface,#fff);cursor:pointer;box-shadow:0 2px 12px rgba(0,0,0,.28);}" +
     ".qb-fab.qb-on{background:var(--quibble-accent,#eab308);color:var(--quibble-on-accent,#1a1a1a);border-color:transparent;}" +
-    ".qb-bubble{position:fixed;z-index:2147483100;transform:translate(-50%,-100%);background:var(--quibble-surface,#1a1a1a);color:var(--quibble-on-surface,#fff);border-radius:8px;padding:4px;box-shadow:0 2px 12px rgba(0,0,0,.3);}" +
+    ".qb-bubble{position:fixed;z-index:2147483646;transform:translate(-50%,-100%);background:var(--quibble-surface,#1a1a1a);color:var(--quibble-on-surface,#fff);border-radius:8px;padding:4px;box-shadow:0 2px 12px rgba(0,0,0,.3);}" +
     ".qb-bubble button{display:inline-flex;align-items:center;gap:6px;font:500 12px var(--quibble-font,system-ui,sans-serif);background:transparent;color:inherit;border:none;cursor:pointer;padding:4px 9px;}" +
-    ".qb-composer,.qb-panel{position:fixed;z-index:2147483100;background:var(--quibble-panel,#fff);color:var(--quibble-on-panel,#1a1a1a);border:1px solid var(--quibble-border-panel,rgba(0,0,0,.12));border-radius:10px;box-shadow:0 8px 30px rgba(0,0,0,.25);font:14px var(--quibble-font,system-ui,sans-serif);}" +
+    ".qb-composer,.qb-panel{position:fixed;z-index:2147483646;background:var(--quibble-panel,#fff);color:var(--quibble-on-panel,#1a1a1a);border:1px solid var(--quibble-border-panel,rgba(0,0,0,.12));border-radius:10px;box-shadow:0 8px 30px rgba(0,0,0,.25);font:14px var(--quibble-font,system-ui,sans-serif);}" +
     ".qb-composer{padding:10px;width:300px;}" +
     ".qb-composer textarea{width:100%;box-sizing:border-box;min-height:62px;font:13px var(--quibble-font,system-ui,sans-serif);padding:7px;border:1px solid var(--quibble-border-panel,rgba(0,0,0,.15));border-radius:7px;background:transparent;color:inherit;resize:vertical;}" +
     ".qb-quote{font-size:12px;color:var(--quibble-muted,#6b7280);border-left:2px solid var(--quibble-accent,#eab308);padding-left:7px;margin:0 0 7px;max-height:48px;overflow:auto;}" +
@@ -214,6 +219,38 @@
     ".qb-switch.qb-on .qb-knob{left:16px;}" +
     "@media (prefers-color-scheme: dark){.qb-panel{--quibble-panel:#1f1f1f;--quibble-on-panel:#f3f4f6;--quibble-border-panel:rgba(255,255,255,.14);}}";
   document.head.appendChild(style);
+
+  /* ------------------------------------------------ Top-layer host (modals) */
+  /* A modal <dialog> (showModal) and fullscreen elements render in the browser
+     "top layer", which paints above EVERYTHING in the normal DOM regardless of
+     z-index — and being inside it is the ONLY way to sit above them (a popover
+     does NOT beat a modal dialog). So we keep all of quibble's surfaces inside
+     one container and, while a modal is open, move that container into it;
+     otherwise it lives on <body>. Overlay-based modals (plain high z-index divs,
+     no top layer) are handled by quibble's own near-maximum z-indexes instead.
+     See issue #4. */
+  var qbRoot = document.createElement("div");
+  qbRoot.className = "qb-root";
+  function topLayerHost() {
+    /* The topmost open modal dialog / fullscreen element, else <body>. */
+    try { var m = document.querySelectorAll(":modal"); if (m.length) return m[m.length - 1]; } catch (e) {}
+    return document.body;
+  }
+  function rehome() {
+    var host = topLayerHost() || document.body;
+    if (qbRoot.parentNode !== host) { host.appendChild(qbRoot); layoutRings(); }
+  }
+  var rehomeQueued = false;
+  function rehomeSoon() {
+    if (rehomeQueued) return;
+    rehomeQueued = true;
+    requestAnimationFrame(function () { rehomeQueued = false; rehome(); });
+  }
+  /* React to dialogs opening/closing (the `open` attribute) and to dialogs being
+     added/removed (e.g. a framework unmounting one with qbRoot still inside it). */
+  try {
+    new MutationObserver(rehomeSoon).observe(document.documentElement, { subtree: true, childList: true, attributes: true, attributeFilter: ["open"] });
+  } catch (e) {}
 
   /* ----------------------------------------------------------- UI guards */
   function isUI(node) {
@@ -306,7 +343,7 @@
   var rings = {}; /* id -> { el, node, orphan } */
   function addRing(id, el, orphan) {
     var node = rings[id] && rings[id].node;
-    if (!node) { node = document.createElement("div"); node.className = "qb-ring"; document.body.appendChild(node); }
+    if (!node) { node = document.createElement("div"); node.className = "qb-ring"; qbRoot.appendChild(node); }
     node.classList.toggle("qb-orphan", !!orphan);
     rings[id] = { el: el, node: node, orphan: !!orphan };
     layoutRing(rings[id]);
@@ -367,7 +404,7 @@
     bubble.style.top = rect.top - 6 + "px";
     bubble.innerHTML = "<button>" + ICON.plus + " Comment</button>";
     bubble.querySelector("button").addEventListener("click", function () { showComposer(rect, target); });
-    document.body.appendChild(bubble);
+    rehome(); qbRoot.appendChild(bubble);
   }
 
   /* --------------------------------------------------------- Element picking */
@@ -378,6 +415,7 @@
     if (panel) { var sw = panel.querySelector("[data-mode-toggle]"); if (sw) { sw.classList.toggle("qb-on", on); sw.setAttribute("aria-checked", on ? "true" : "false"); } }
     if (on) {
       clearTransient();
+      rehome();
       document.addEventListener("mousemove", onPickMove, true);
       document.addEventListener("click", onPickClick, true);
       document.addEventListener("keydown", onPickKey, true);
@@ -392,7 +430,7 @@
   function onPickMove(e) {
     var el = e.target;
     if (!el || isUI(el)) { if (hoverBox) hoverBox.style.display = "none"; return; }
-    if (!hoverBox) { hoverBox = document.createElement("div"); hoverBox.className = "qb-hover"; document.body.appendChild(hoverBox); }
+    if (!hoverBox) { hoverBox = document.createElement("div"); hoverBox.className = "qb-hover"; qbRoot.appendChild(hoverBox); }
     var b = el.getBoundingClientRect();
     hoverBox.style.display = "block";
     hoverBox.style.left = b.left + "px"; hoverBox.style.top = b.top + "px";
@@ -428,7 +466,7 @@
     composer.innerHTML = quote +
       '<textarea placeholder="Your feedback on this…"></textarea>' +
       '<div class="qb-row"><button class="qb-btn qb-cancel">Cancel</button><button class="qb-btn pri qb-save">Save</button></div>';
-    document.body.appendChild(composer);
+    rehome(); qbRoot.appendChild(composer);
     composerTarget = target;
     var ta = composer.querySelector("textarea"); ta.focus();
     composer.querySelector(".qb-cancel").addEventListener("click", dismissComposer);
@@ -463,7 +501,7 @@
       fab = document.createElement("button"); fab.className = "qb-fab";
       fab.addEventListener("click", togglePanel);
       bar.appendChild(fab);
-      document.body.appendChild(bar);
+      qbRoot.appendChild(bar);
     }
     var n = load().length;
     fab.innerHTML = ICON.messages + " Feedback" + (n ? " · " + n : "");
@@ -474,7 +512,7 @@
     if (configPanel) { configPanel.remove(); configPanel = null; } /* share one corner */
     panel = document.createElement("div"); panel.className = "qb-panel";
     renderPanel();
-    document.body.appendChild(panel);
+    rehome(); qbRoot.appendChild(panel);
   }
 
   /* ------------------------------------------------------------ Config panel */
@@ -678,6 +716,7 @@
   applyTheme(settings.theme);
   renderFab();
   if (settings.defaultMode === "element") setTimeout(function () { setPicking(true); }, 0);
+  rehome();
   if (document.readyState === "complete") setTimeout(reapply, 80);
   else window.addEventListener("load", function () { setTimeout(reapply, 80); });
 })();
