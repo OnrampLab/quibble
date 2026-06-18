@@ -93,7 +93,7 @@
   <section>
     <div class="wrap">
       <h2>Install</h2>
-      <pre>&lt;script src="https://cdn.jsdelivr.net/gh/OnrampLab/quibble@v1/quibble.js"
+      <pre>&lt;script src="https://cdn.jsdelivr.net/gh/OnrampLab/quibble@latest/quibble.js"
         data-project="my-mockups"&gt;&lt;/script&gt;</pre>
       <p class="hint">That's it. A floating <b>Element</b> / <b>Feedback</b> bar appears in the bottom-right. This very page loads quibble the same way.</p>
     </div>
@@ -116,7 +116,7 @@
       <div class="verbar">
         <label for="qbVersion">quibble build on this page</label>
         <select id="qbVersion" aria-label="Select the quibble version to load on this page">
-          <option value="v1">v1 · latest stable</option>
+          <option value="latest">latest · stable</option>
         </select>
         <span class="ver-url" id="qbVersionUrl"></span>
       </div>
@@ -158,12 +158,12 @@
   </footer>
 
   <!-- quibble, loaded from the same CDN URL you'd use. The version is chosen by
-       the dropdown above (?ver=…), defaulting to the moving @v1 stable tag. This
+       the dropdown above (?ver=…), defaulting to the floating @latest stable tag. This
        lets us preview a specific release — including RC pre-releases — on this page. -->
   <script>
     (function () {
       var REPO = "OnrampLab/quibble";
-      var DEFAULT = "v1";
+      var DEFAULT = "latest";
       var ver = new URLSearchParams(location.search).get("ver") || DEFAULT;
       // Git tags are a limited charset; ignore anything that isn't one.
       if (!/^[\w.\-]+$/.test(ver)) ver = DEFAULT;
@@ -183,7 +183,7 @@
       var sel = document.getElementById("qbVersion");
       var urlNote = document.getElementById("qbVersionUrl");
       if (!sel) return;
-      var current = window.__quibbleVersion || "v1";
+      var current = window.__quibbleVersion || "latest";
       if (urlNote) urlNote.textContent = window.__quibbleSrc || "";
 
       // jsDelivr reports tags without the leading "v" (e.g. tag v1.0.0 → "1.0.0");
@@ -202,9 +202,8 @@
 
       function build(versions) {
         sel.innerHTML = "";
-        sel.appendChild(option("v1", "v1 · latest stable (recommended)"));
+        sel.appendChild(option("latest", "latest · stable (recommended)"));
         versions.forEach(function (v) {
-          if (norm(v) === "1") return; // the moving v1 tag — same as the pinned option
           sel.appendChild(option(v, v + (isPre(v) ? " · pre-release" : "")));
         });
         // Always keep the current selection available, even if the API omits it.
@@ -213,7 +212,7 @@
       }
 
       // Show at least the current build immediately, then enrich from jsDelivr.
-      build(current === "v1" ? [] : [current]);
+      build(current === "latest" ? [] : [current]);
 
       fetch("https://data.jsdelivr.com/v1/packages/gh/" + REPO)
         .then(function (r) { return r.ok ? r.json() : Promise.reject(r.status); })
@@ -226,7 +225,7 @@
       // Switching version reloads the page with ?ver=… (quibble loads once per page).
       sel.addEventListener("change", function () {
         var p = new URLSearchParams(location.search);
-        if (sel.value === "v1") p.delete("ver"); else p.set("ver", sel.value);
+        if (sel.value === "latest") p.delete("ver"); else p.set("ver", sel.value);
         var qs = p.toString();
         location.search = qs ? "?" + qs : "";
       });
