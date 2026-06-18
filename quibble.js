@@ -231,14 +231,21 @@
      See issue #4. */
   var qbRoot = document.createElement("div");
   qbRoot.className = "qb-root";
+  /* Inside a modal dialog, qbRoot is not part of the dialog's content, so a
+     click on quibble's chrome would bubble to a "click-outside-to-close"
+     handler and dismiss the modal. Stop it at the container. */
+  qbRoot.addEventListener("click", function (e) { e.stopPropagation(); });
   function topLayerHost() {
     /* The topmost open modal dialog / fullscreen element, else <body>. */
     try { var m = document.querySelectorAll(":modal"); if (m.length) return m[m.length - 1]; } catch (e) {}
     return document.body;
   }
   function rehome() {
-    var host = topLayerHost() || document.body;
-    if (qbRoot.parentNode !== host) { host.appendChild(qbRoot); layoutRings(); }
+    /* NOTE: if the host (or an ancestor) has a CSS transform/perspective/filter,
+       it becomes the containing block for our position:fixed surfaces, which can
+       misalign rings/hover/composer. Accepted limitation for this lightweight tool. */
+    var host = topLayerHost();
+    if (host && qbRoot.parentNode !== host) { host.appendChild(qbRoot); layoutRings(); }
   }
   var rehomeQueued = false;
   function rehomeSoon() {
@@ -246,11 +253,13 @@
     rehomeQueued = true;
     requestAnimationFrame(function () { rehomeQueued = false; rehome(); });
   }
-  /* React to dialogs opening/closing (the `open` attribute) and to dialogs being
-     added/removed (e.g. a framework unmounting one with qbRoot still inside it). */
+  /* React to dialogs opening/closing (the `open` attribute), dialogs being
+     added/removed (e.g. a framework unmounting one with qbRoot still inside it),
+     and fullscreen state changes (which mutate neither the DOM nor `open`). */
   try {
     new MutationObserver(rehomeSoon).observe(document.documentElement, { subtree: true, childList: true, attributes: true, attributeFilter: ["open"] });
   } catch (e) {}
+  document.addEventListener("fullscreenchange", rehomeSoon);
 
   /* ----------------------------------------------------------- UI guards */
   function isUI(node) {
@@ -717,6 +726,9 @@
   renderFab();
   if (settings.defaultMode === "element") setTimeout(function () { setPicking(true); }, 0);
   rehome();
-  if (document.readyState === "complete") setTimeout(reapply, 80);
-  else window.addEventListener("load", function () { setTimeout(reapply, 80); });
+  /* If the script ran in <head>, document.body was null above and qbRoot never
+     attached; rehome() again once the DOM is ready so the UI always shows. */
+  function boot() { rehome(); reapply(); }
+  if (document.readyState === "complete") setTimeout(boot, 80);
+  else window.addEventListener("load", function () { setTimeout(boot, 80); });
 })();
