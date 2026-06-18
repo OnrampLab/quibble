@@ -12,6 +12,8 @@
  *    <script src="https://cdn.jsdelivr.net/gh/OnrampLab/quibble@latest/quibble.js"
  *            data-project="my-mockups"></script>
  *
+ *    (Loading the tag from inside <head> also works — quibble waits for the DOM.)
+ *
  *    Attributes:
  *      data-project      (optional) names the project; shown in the export.
  *                        Default: "untitled".

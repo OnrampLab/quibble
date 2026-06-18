@@ -39,12 +39,10 @@ Or self-host: drop `quibble.js` next to your HTML and
 A floating **Feedback** button appears in the bottom-right corner; element picking
 and settings live inside its panel header.
 
-## Release candidate — v1.1 (config panel)
+## Settings panel
 
-> ⚠️ **Pre-release.** `@latest` stays on the current stable build until this is promoted.
-
-A **Settings** panel (⚙ gear in the **Feedback** panel header) is in testing. It
-adds, all persisted in `localStorage`:
+A **Settings** panel (⚙ gear in the **Feedback** panel header) configures, all
+persisted in `localStorage`:
 
 - **Element picking switch** — a ⌖ toggle in the Feedback panel header arms element picking; it's **sticky** — stays armed after each pick until <kbd>Esc</kbd>.
 - **Default mode on load** — set **Element** to arm that switch automatically on every load ([#2](https://github.com/OnrampLab/quibble/issues/2)).
@@ -52,14 +50,9 @@ adds, all persisted in `localStorage`:
 - **Theme** — accent / bar colors and font.
 - **Project / storage key** — rename or re-namespace without touching the script tag.
 
-**Try it live:** **<https://onramplab.github.io/quibble/>** — the landing demo links through to the RC page.
-
-Or pin the release candidate yourself (defaults match `@latest`, so JSON stays default):
-
-```html
-<script src="https://cdn.jsdelivr.net/gh/OnrampLab/quibble@v1.1.0-rc.1/quibble.js"
-        data-project="my-mockups"></script>
-```
+**Try it live:** **<https://onramplab.github.io/quibble/>** — annotate the sample
+draft right on the landing page (it loads the current build same-origin, and a
+version picker lets you load any published release from jsDelivr).
 
 ## Usage
 
@@ -143,9 +136,11 @@ Text highlights use the [CSS Custom Highlight API](https://developer.mozilla.org
 where available (Chrome/Edge/Safari), with a `<mark>` fallback for older browsers.
 Element rings work everywhere.
 
-## Demo
+## Demo & manual tests
 
-Open [`demo/index.html`](demo/index.html) in a browser. Manual test checklist:
+The landing page **<https://onramplab.github.io/quibble/>** doubles as the manual
+test surface (locally: serve the repo and open `docs/index.html`, which loads
+`quibble.js` from the repo root). Checklist:
 
 - [ ] Select text → comment → it highlights and counts in the bar
 - [ ] Element mode → click the image/card → ring appears
@@ -153,6 +148,9 @@ Open [`demo/index.html`](demo/index.html) in a browser. Manual test checklist:
 - [ ] Click a comment in the panel → page scrolls and flashes the target
 - [ ] Copy JSON / Export / Clear
 - [ ] Delete an element, reload → its comment shows as orphaned
+- [ ] **Open modal dialog** → quibble's bar/panel/rings sit above the modal; clicking quibble chrome does not close it (issue #4)
+- [ ] **View hero fullscreen** → quibble rehomes into the fullscreen element
+- [ ] Version picker → choose a published release → page reloads and loads it from jsDelivr
 
 ## License
 

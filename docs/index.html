@@ -72,6 +72,20 @@
     .verbar .ver-url { color: var(--muted); font-size: 12.5px; font-family: ui-monospace, Menlo, Consolas, monospace;
                        word-break: break-all; flex-basis: 100%; }
 
+    /* top-layer tests (issue #4): modal dialog + fullscreen */
+    .tests { display: flex; flex-wrap: wrap; gap: 10px; margin: 18px 0 0; }
+    .test-btn { padding: 9px 16px; border-radius: 8px; background: var(--ink); color: #fff;
+                border: none; font: inherit; font-weight: 600; font-size: 14px; cursor: pointer; }
+    .test-hint { color: var(--muted); font-size: 13px; margin: 8px 0 0; }
+    dialog.qb-modal { width: 100%; max-width: 460px; border: none; border-radius: 16px; padding: 0;
+                      box-shadow: 0 24px 60px rgba(0,0,0,.3); }
+    dialog.qb-modal::backdrop { background: rgba(15,23,42,.6); }
+    dialog.qb-modal .dialog-content { padding: 26px; }
+    dialog.qb-modal h3 { margin: 0 0 8px; font-size: 19px; }
+    dialog.qb-modal p { margin: 0 0 18px; color: var(--muted); font-size: 14.5px; }
+    dialog.qb-modal .x { float: right; border: none; background: none; cursor: pointer;
+                         font-size: 20px; line-height: 1; color: var(--muted); }
+
     footer { padding: 36px 0 60px; color: var(--muted); font-size: 14px; }
     @media (max-width: 640px) { .steps, .cards { grid-template-columns: 1fr; } header.hero h1 { font-size: 34px; } }
   </style>
@@ -84,7 +98,6 @@
       <p class="tag">A drop-in text &amp; element commenting layer for AI-assisted iteration. One script tag, no dependencies, no backend.</p>
       <div class="btns">
         <a class="btn solid" href="#try">Try it on this page ↓</a>
-        <a class="btn ghost" href="rc.html">Try the v1.1 RC →</a>
         <a class="btn ghost" href="https://github.com/OnrampLab/quibble">View on GitHub</a>
       </div>
     </div>
@@ -116,7 +129,7 @@
       <div class="verbar">
         <label for="qbVersion">quibble build on this page</label>
         <select id="qbVersion" aria-label="Select the quibble version to load on this page">
-          <option value="latest">latest · stable</option>
+          <option value="local">This build (local)</option>
         </select>
         <span class="ver-url" id="qbVersionUrl"></span>
       </div>
@@ -146,9 +159,32 @@
         <h3>Get started</h3>
         <p>Choose a plan that fits how much you brew and we will handle the rest.</p>
         <a class="cta" href="#try">Start my subscription</a>
+
+        <h3>Top-layer tests (issue #4)</h3>
+        <p>quibble's bar, panel and rings must stay above a browser top-layer surface
+          (modal <code>&lt;dialog&gt;</code> / fullscreen), and clicking quibble's own chrome
+          must not close the modal. Use these to regression-test the selected build.</p>
+        <div class="tests">
+          <button id="qbOpenModal" class="test-btn" type="button">Open modal dialog</button>
+          <button id="qbFullscreen" class="test-btn" type="button">View hero fullscreen</button>
+        </div>
       </div>
     </div>
   </section>
+
+  <!-- Modal <dialog> test (showModal renders in the browser top layer). Verifies
+       quibble rehomes its chrome into the modal and that clicking quibble's bar/panel
+       does NOT bubble to the click-outside-to-close handler — issue #4. -->
+  <dialog id="qbTestModal" class="qb-modal" aria-label="Sample modal dialog">
+    <div class="dialog-content">
+      <button data-close class="x" aria-label="Close dialog" type="button">×</button>
+      <h3>Limited release — Single-origin Ethiopia</h3>
+      <p>A bright, floral lot we roast in small batches. Select this text to comment,
+        or use Element mode and click the button below — quibble should appear above
+        this modal. Clicking quibble's own bar/panel must <strong>not</strong> close it.</p>
+      <a class="cta" href="#">Add to my subscription</a>
+    </div>
+  </dialog>
 
   <footer>
     <div class="wrap">
@@ -157,20 +193,22 @@
     </div>
   </footer>
 
-  <!-- quibble, loaded from the same CDN URL you'd use. The version is chosen by
-       the dropdown above (?ver=…), defaulting to the floating @latest stable tag. This
-       lets us preview a specific release — including RC pre-releases — on this page. -->
+  <!-- quibble loader. Default (no ?ver) loads our OWN build same-origin from this
+       GitHub Pages site (/quibble.js, published alongside docs/ by the Pages Action).
+       Picking a version in the dropdown reloads with ?ver=X.Y.Z and loads that
+       release from jsDelivr instead — handy for regression-testing a pinned build. -->
   <script>
     (function () {
       var REPO = "OnrampLab/quibble";
-      var DEFAULT = "latest";
-      var ver = new URLSearchParams(location.search).get("ver") || DEFAULT;
-      // Git tags are a limited charset; ignore anything that isn't one.
-      if (!/^[\w.\-]+$/.test(ver)) ver = DEFAULT;
+      var ver = new URLSearchParams(location.search).get("ver") || "local";
+      // Git tags are a limited charset; anything else falls back to the local build.
+      if (ver !== "local" && !/^[\w.\-]+$/.test(ver)) ver = "local";
       window.__quibbleVersion = ver;
-      window.__quibbleSrc = "https://cdn.jsdelivr.net/gh/" + REPO + "@" + ver + "/quibble.js";
+      window.__quibbleSrc = ver === "local"
+        ? "quibble.js"
+        : "https://cdn.jsdelivr.net/gh/" + REPO + "@" + ver + "/quibble.js";
 
-      // Load quibble itself from the selected version.
+      // Load quibble itself from the selected source.
       var s = document.createElement("script");
       s.src = window.__quibbleSrc;
       s.setAttribute("data-project", "quibble-live-demo");
@@ -183,7 +221,7 @@
       var sel = document.getElementById("qbVersion");
       var urlNote = document.getElementById("qbVersionUrl");
       if (!sel) return;
-      var current = window.__quibbleVersion || "latest";
+      var current = window.__quibbleVersion || "local";
       if (urlNote) urlNote.textContent = window.__quibbleSrc || "";
 
       // jsDelivr reports tags without the leading "v" (e.g. tag v1.0.0 → "1.0.0");
@@ -202,17 +240,17 @@
 
       function build(versions) {
         sel.innerHTML = "";
-        sel.appendChild(option("latest", "latest · stable (recommended)"));
+        sel.appendChild(option("local", "This build (local)"));
         versions.forEach(function (v) {
-          sel.appendChild(option(v, v + (isPre(v) ? " · pre-release" : "")));
+          sel.appendChild(option(v, v + (isPre(v) ? " · pre-release" : "") + " · jsDelivr"));
         });
         // Always keep the current selection available, even if the API omits it.
         var has = Array.prototype.some.call(sel.options, function (o) { return norm(o.value) === currentNorm; });
-        if (!has) sel.appendChild(option(current, current + " · current"));
+        if (!has) sel.appendChild(option(current, current + " · jsDelivr"));
       }
 
-      // Show at least the current build immediately, then enrich from jsDelivr.
-      build(current === "latest" ? [] : [current]);
+      // Show just the local build immediately, then enrich with jsDelivr releases.
+      build(current === "local" ? [] : [current]);
 
       fetch("https://data.jsdelivr.com/v1/packages/gh/" + REPO)
         .then(function (r) { return r.ok ? r.json() : Promise.reject(r.status); })
@@ -222,13 +260,42 @@
         })
         .catch(function () { /* keep the fallback list */ });
 
-      // Switching version reloads the page with ?ver=… (quibble loads once per page).
+      // Switching reloads the page with ?ver=… (quibble loads once per page).
+      // "local" drops ?ver and loads same-origin; a version loads it from jsDelivr.
       sel.addEventListener("change", function () {
         var p = new URLSearchParams(location.search);
-        if (sel.value === "latest") p.delete("ver"); else p.set("ver", sel.value);
+        if (sel.value === "local") p.delete("ver"); else p.set("ver", sel.value);
         var qs = p.toString();
         location.search = qs ? "?" + qs : "";
       });
+    })();
+  </script>
+  <script>
+    // Top-layer tests (issue #4): modal <dialog> + fullscreen.
+    (function () {
+      var dlg = document.getElementById("qbTestModal");
+      var open = document.getElementById("qbOpenModal");
+      var fs = document.getElementById("qbFullscreen");
+      if (dlg && open) {
+        open.addEventListener("click", function () { dlg.showModal(); });
+        dlg.querySelector("[data-close]").addEventListener("click", function () { dlg.close(); });
+        // Click-outside-to-close: closes only when the click is outside the white
+        // panel. quibble's qbRoot stops propagation so clicking its own chrome
+        // (in the dialog's top layer, but outside .dialog-content) won't close it.
+        dlg.addEventListener("click", function (e) {
+          if (!e.target.closest(".dialog-content")) dlg.close();
+        });
+      }
+      if (fs) {
+        // :modal matches a fullscreen element; entering/exiting fullscreen mutates
+        // neither the DOM nor a dialog attribute, so it exercises quibble's
+        // fullscreenchange rehome path.
+        fs.addEventListener("click", function () {
+          var hero = document.querySelector(".hero-img");
+          if (document.fullscreenElement) document.exitFullscreen();
+          else if (hero && hero.requestFullscreen) hero.requestFullscreen();
+        });
+      }
     })();
   </script>
 </body>
