@@ -63,6 +63,15 @@
     .cta { display: inline-block; margin-top: 14px; padding: 10px 18px; border-radius: 8px;
            background: var(--brand); color: #fff; text-decoration: none; font-weight: 600; }
 
+    /* version picker */
+    .verbar { display: flex; align-items: center; flex-wrap: wrap; gap: 10px 14px; margin-bottom: 22px;
+              background: var(--soft); border: 1px solid var(--line); border-radius: 12px; padding: 13px 16px; font-size: 14px; }
+    .verbar label { font-weight: 600; }
+    .verbar select { font: 14px system-ui, sans-serif; padding: 6px 28px 6px 10px; border: 1px solid var(--line);
+                     border-radius: 8px; background: #fff; color: var(--ink); cursor: pointer; }
+    .verbar .ver-url { color: var(--muted); font-size: 12.5px; font-family: ui-monospace, Menlo, Consolas, monospace;
+                       word-break: break-all; flex-basis: 100%; }
+
     footer { padding: 36px 0 60px; color: var(--muted); font-size: 14px; }
     @media (max-width: 640px) { .steps, .cards { grid-template-columns: 1fr; } header.hero h1 { font-size: 34px; } }
   </style>
@@ -104,6 +113,13 @@
   <section id="try">
     <div class="wrap">
       <h2>Live demo — try it now</h2>
+      <div class="verbar">
+        <label for="qbVersion">quibble build on this page</label>
+        <select id="qbVersion" aria-label="Select the quibble version to load on this page">
+          <option value="v1">v1 · latest stable</option>
+        </select>
+        <span class="ver-url" id="qbVersionUrl"></span>
+      </div>
       <div class="demo-banner">
         👇 The draft below is fully annotatable. <b>Select any text</b> and click <b>Comment</b>, or click <b>Element</b> in the bottom-right bar and then click the image / a card / the button. Open <b>Feedback</b> to see the JSON you'd send your AI.
       </div>
@@ -141,7 +157,80 @@
     </div>
   </footer>
 
-  <!-- quibble, loaded from the same CDN URL you'd use -->
-  <script src="https://cdn.jsdelivr.net/gh/OnrampLab/quibble@v1/quibble.js" data-project="quibble-live-demo"></script>
+  <!-- quibble, loaded from the same CDN URL you'd use. The version is chosen by
+       the dropdown above (?ver=…), defaulting to the moving @v1 stable tag. This
+       lets us preview a specific release — including RC pre-releases — on this page. -->
+  <script>
+    (function () {
+      var REPO = "OnrampLab/quibble";
+      var DEFAULT = "v1";
+      var ver = new URLSearchParams(location.search).get("ver") || DEFAULT;
+      // Git tags are a limited charset; ignore anything that isn't one.
+      if (!/^[\w.\-]+$/.test(ver)) ver = DEFAULT;
+      window.__quibbleVersion = ver;
+      window.__quibbleSrc = "https://cdn.jsdelivr.net/gh/" + REPO + "@" + ver + "/quibble.js";
+
+      // Load quibble itself from the selected version.
+      var s = document.createElement("script");
+      s.src = window.__quibbleSrc;
+      s.setAttribute("data-project", "quibble-live-demo");
+      document.body.appendChild(s);
+    })();
+  </script>
+  <script>
+    (function () {
+      var REPO = "OnrampLab/quibble";
+      var sel = document.getElementById("qbVersion");
+      var urlNote = document.getElementById("qbVersionUrl");
+      if (!sel) return;
+      var current = window.__quibbleVersion || "v1";
+      if (urlNote) urlNote.textContent = window.__quibbleSrc || "";
+
+      // jsDelivr reports tags without the leading "v" (e.g. tag v1.0.0 → "1.0.0");
+      // normalize so options dedupe and the current selection matches either form.
+      var norm = function (v) { return String(v).replace(/^v/, ""); };
+      var currentNorm = norm(current);
+      var isPre = function (v) { return /-(rc|alpha|beta|pre)/i.test(v); };
+
+      function option(value, label) {
+        var o = document.createElement("option");
+        o.value = value;
+        o.textContent = label;
+        if (norm(value) === currentNorm) o.selected = true;
+        return o;
+      }
+
+      function build(versions) {
+        sel.innerHTML = "";
+        sel.appendChild(option("v1", "v1 · latest stable (recommended)"));
+        versions.forEach(function (v) {
+          if (norm(v) === "1") return; // the moving v1 tag — same as the pinned option
+          sel.appendChild(option(v, v + (isPre(v) ? " · pre-release" : "")));
+        });
+        // Always keep the current selection available, even if the API omits it.
+        var has = Array.prototype.some.call(sel.options, function (o) { return norm(o.value) === currentNorm; });
+        if (!has) sel.appendChild(option(current, current + " · current"));
+      }
+
+      // Show at least the current build immediately, then enrich from jsDelivr.
+      build(current === "v1" ? [] : [current]);
+
+      fetch("https://data.jsdelivr.com/v1/packages/gh/" + REPO)
+        .then(function (r) { return r.ok ? r.json() : Promise.reject(r.status); })
+        .then(function (data) {
+          var vs = (data.versions || []).map(function (x) { return typeof x === "string" ? x : x.version; });
+          build(vs);
+        })
+        .catch(function () { /* keep the fallback list */ });
+
+      // Switching version reloads the page with ?ver=… (quibble loads once per page).
+      sel.addEventListener("change", function () {
+        var p = new URLSearchParams(location.search);
+        if (sel.value === "v1") p.delete("ver"); else p.set("ver", sel.value);
+        var qs = p.toString();
+        location.search = qs ? "?" + qs : "";
+      });
+    })();
+  </script>
 </body>
 </html>

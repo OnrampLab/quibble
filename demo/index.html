@@ -4,6 +4,8 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>quibble demo — sample page</title>
+  <!-- Tailwind Play CDN: utility classes for the modal dialog, no build step. -->
+  <script src="https://cdn.tailwindcss.com"></script>
   <style>
     :root { --ink: #1f2937; --muted: #6b7280; --line: #e5e7eb; --bg: #fafafa; }
     * { box-sizing: border-box; }
@@ -22,6 +24,8 @@
     .card p { margin: 0; font-size: 13px; color: var(--muted); }
     .cta { display: inline-block; margin-top: 12px; padding: 10px 18px; border-radius: 8px;
            background: #16a34a; color: #fff; text-decoration: none; font-weight: 600; }
+    .open-dialog { display: inline-block; margin-top: 8px; padding: 10px 18px; border-radius: 8px;
+                   background: #1f2937; color: #fff; border: none; font: inherit; font-weight: 600; cursor: pointer; }
     footer { color: var(--muted); font-size: 13px; border-top: 1px solid var(--line); padding-top: 16px; }
   </style>
 </head>
@@ -31,7 +35,13 @@
     <p class="lede">A fictional sample page for trying quibble. Select any text to comment, or use Element mode to mark up the layout.</p>
 
     <section>
-      <div class="hero">PRODUCT PHOTO</div>
+      <button id="open" class="open-dialog">Open dialog (test quibble in a modal)</button>
+      <button id="fs" class="open-dialog">View photo fullscreen (test fullscreen)</button>
+      <a class="cta" href="head-load.html">Head-load test ↗</a>
+    </section>
+
+    <section>
+      <div id="hero" class="hero">PRODUCT PHOTO</div>
     </section>
 
     <section>
@@ -59,7 +69,54 @@
     <footer>Fictional sample · for demonstrating quibble only.</footer>
   </main>
 
+  <!-- A modal <dialog> (showModal renders in the browser top layer). Opening it
+       lets you test that quibble's bar, panel, composer and rings stay above a
+       top-layer modal — issue #4. The page content above stays as-is. -->
+  <dialog id="demo"
+          class="w-full max-w-lg rounded-2xl p-0 shadow-2xl backdrop:bg-slate-900/60 backdrop:backdrop-blur-sm">
+    <div class="dialog-content p-7">
+      <div class="flex items-start justify-between gap-4">
+        <h2 class="text-xl font-bold tracking-tight text-slate-800">Limited release — Single-origin Ethiopia</h2>
+        <button data-close aria-label="Close dialog"
+                class="shrink-0 rounded-md p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+            <path d="M6 6l12 12M18 6L6 18" />
+          </svg>
+        </button>
+      </div>
+      <p class="mt-3 text-slate-600">A bright, floral lot we roast in small batches. Select this text to comment,
+        or use Element mode and click the button below — quibble should appear above this modal.
+        This dialog closes when you click outside its white panel, so clicking quibble's own bar/panel
+        must <strong>not</strong> close it.</p>
+      <a href="#"
+         class="mt-5 inline-block rounded-lg bg-emerald-600 px-5 py-2.5 font-semibold text-white hover:bg-emerald-700">
+        Add to my subscription
+      </a>
+    </div>
+  </dialog>
+
   <!-- quibble: served locally for the demo -->
   <script src="../quibble.js" data-project="quibble-demo"></script>
+  <script>
+    var dlg = document.getElementById("demo");
+    document.getElementById("open").addEventListener("click", function () { dlg.showModal(); });
+    dlg.querySelector("[data-close]").addEventListener("click", function () { dlg.close(); });
+    /* Click-outside-to-close: closes when the click is not inside the white
+       content panel. Without quibble's qbRoot stopPropagation, clicking
+       quibble's own chrome (which sits in the dialog's top layer but outside
+       .dialog-content) would bubble here and wrongly close the modal. */
+    dlg.addEventListener("click", function (e) {
+      if (!e.target.closest(".dialog-content")) dlg.close();
+    });
+
+    /* Fullscreen test: :modal matches a fullscreen element, but entering/exiting
+       fullscreen mutates neither the DOM nor the dialog `open` attribute, so it
+       relies on quibble's fullscreenchange listener to rehome into the element. */
+    document.getElementById("fs").addEventListener("click", function () {
+      var hero = document.getElementById("hero");
+      if (document.fullscreenElement) document.exitFullscreen();
+      else hero.requestFullscreen();
+    });
+  </script>
 </body>
 </html>
