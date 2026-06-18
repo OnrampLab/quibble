@@ -20,9 +20,10 @@ node --check quibble.js                                              # syntax ch
 node -e "JSON.parse(require('fs').readFileSync('examples/feedback.sample.json','utf8'))"  # validate sample JSON
 ```
 
-Testing is manual: open `demo/index.html` in a browser and run the checklist at
-the bottom of `README.md` (select text → comment → reload re-anchors → jump →
-delete element → orphaned). There is no automated test suite.
+Testing is manual: open `docs/index.html` (the landing page doubles as the test
+surface) in a browser and run the checklist at the bottom of `README.md` (select
+text → comment → reload re-anchors → jump → delete element → orphaned → modal
+dialog → fullscreen). There is no automated test suite.
 
 ## Distribution & releases
 
@@ -42,6 +43,14 @@ Release process (single-repo, CDN-pinned — does NOT use cl-release-manager):
   `v1` git tag. A literal `v1` tag makes jsDelivr serve `@v1` as an **immutable**
   pin (`Cache-Control: immutable`, cached ~1 year), so moving it silently freezes
   the CDN on stale content. Always cut a brand-new version number instead.
+
+The landing page is published by GitHub Pages via the `pages.yml` Actions workflow
+(Pages source = "GitHub Actions", not branch/`docs`): it copies `docs/` to the
+site root and the repo-root `quibble.js` to `/quibble.js`. So `docs/index.html`
+loads quibble **same-origin** from `/quibble.js` by default (the current `main`
+build, live ~1 min after a push), and its version picker can reload with
+`?ver=X.Y.Z` to load a published release from jsDelivr instead. `quibble.js` stays
+the single source of truth at the repo root — never add a second copy under `docs/`.
 
 Because `@latest` is the live URL for every existing page, treat `quibble.js` as a
 published API: the script-tag attributes (`data-project`, `data-storage-key`) and
@@ -88,5 +97,6 @@ The non-obvious pieces that span the file:
 - **UI guards.** `isUI()` / `inUIText()` keep quibble's own chrome out of
   selection, picking, and text-search so it never comments on itself.
 
-`demo/index.html` and `docs/index.html` are standalone HTML pages that include the
-script for manual testing and the landing page respectively.
+`docs/index.html` is the landing page **and** the manual test surface: it embeds a
+sample draft plus top-layer test triggers (modal `<dialog>` + fullscreen, issue #4)
+and a version picker. It loads `quibble.js` same-origin by default (see Distribution).

@@ -1,0 +1,41 @@
+name: pages
+
+# Publish docs/ as the site, with the repo-root quibble.js copied to the site
+# root so the landing page can load it same-origin (/quibble.js) and so
+# https://onramplab.github.io/quibble/quibble.js always serves the current build.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Allow one concurrent deployment; let an in-progress run finish.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Assemble site (docs/ + quibble.js at root)
+        run: |
+          mkdir -p _site
+          cp -r docs/. _site/
+          rm -rf _site/plans          # internal design docs, not for the public site
+          cp quibble.js _site/quibble.js
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+      - id: deployment
+        uses: actions/deploy-pages@v4
