@@ -24,7 +24,7 @@ No backend. No dependencies. No build step.
 Add one script tag. Served straight from the repo via jsDelivr — nothing to publish:
 
 ```html
-<script src="https://cdn.jsdelivr.net/gh/onramplab/quibble@v1/quibble.js"
+<script src="https://cdn.jsdelivr.net/gh/OnrampLab/quibble@latest/quibble.js"
         data-project="my-mockups"></script>
 ```
 
@@ -41,7 +41,7 @@ and settings live inside its panel header.
 
 ## Release candidate — v1.1 (config panel)
 
-> ⚠️ **Pre-release.** `@v1` stays on the current stable build until this is promoted.
+> ⚠️ **Pre-release.** `@latest` stays on the current stable build until this is promoted.
 
 A **Settings** panel (⚙ gear in the **Feedback** panel header) is in testing. It
 adds, all persisted in `localStorage`:
@@ -54,7 +54,7 @@ adds, all persisted in `localStorage`:
 
 **Try it live:** **<https://onramplab.github.io/quibble/>** — the landing demo links through to the RC page.
 
-Or pin the release candidate yourself (defaults match `@v1`, so JSON stays default):
+Or pin the release candidate yourself (defaults match `@latest`, so JSON stays default):
 
 ```html
 <script src="https://cdn.jsdelivr.net/gh/OnrampLab/quibble@v1.1.0-rc.1/quibble.js"

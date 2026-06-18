@@ -26,20 +26,24 @@ delete element → orphaned). There is no automated test suite.
 
 ## Distribution & releases
 
-Consumers load the file straight from the repo via jsDelivr, pinned to the moving
-`@v1` tag — nothing is published to npm:
+Consumers load the file straight from the repo via jsDelivr, pinned to the
+floating `@latest` tag — nothing is published to npm:
 
 ```
-https://cdn.jsdelivr.net/gh/OnrampLab/quibble@v1/quibble.js
+https://cdn.jsdelivr.net/gh/OnrampLab/quibble@latest/quibble.js
 ```
 
 Release process (single-repo, CDN-pinned — does NOT use cl-release-manager):
 - **RC** = pre-release git tag `v1.<minor>.0-rc.<N>`, tested via its own CDN URL
   (`@v1.1.0-rc.1`).
-- **Promote** by tagging final `v1.<minor>.0` and moving the `v1` tag to it, so
-  `@v1` picks up the release. Do not move `v1` until promotion.
+- **Promote** by tagging a new, higher `v1.<minor>.0` (e.g. `v1.2.0`). jsDelivr's
+  `@latest` floats to the newest stable tag automatically — no purge, no waiting.
+- **Never** force-move an existing version tag and **never** maintain a literal
+  `v1` git tag. A literal `v1` tag makes jsDelivr serve `@v1` as an **immutable**
+  pin (`Cache-Control: immutable`, cached ~1 year), so moving it silently freezes
+  the CDN on stale content. Always cut a brand-new version number instead.
 
-Because `@v1` is the live URL for every existing page, treat `quibble.js` as a
+Because `@latest` is the live URL for every existing page, treat `quibble.js` as a
 published API: the script-tag attributes (`data-project`, `data-storage-key`) and
 the exported JSON schema are a contract. The header comment block at the top of
 `quibble.js` and the schema in `README.md` document that contract for AI agents
