@@ -1,3 +1,6 @@
 .DS_Store
 node_modules/
 *.log
+
+# git worktrees (kept out of the project root checkout)
+.worktree/
