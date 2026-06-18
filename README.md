@@ -38,6 +38,27 @@ Or self-host: drop `quibble.js` next to your HTML and
 
 A floating **Element** / **Feedback** bar appears in the bottom-right corner.
 
+## Release candidate — v1.1 (config panel)
+
+> ⚠️ **Pre-release.** `@v1` stays on the current stable build until this is promoted.
+
+A **Settings** panel (⚙ gear on the bar) is in testing. It adds, all persisted in
+`localStorage`:
+
+- **Default mode on load** — arm **Element** picking automatically ([#2](https://github.com/OnrampLab/quibble/issues/2)).
+- **Export format** — **JSON**, **YAML**, or **Markdown**; Copy and Export both follow it ([#1](https://github.com/OnrampLab/quibble/issues/1)).
+- **Theme** — accent / bar colors and font.
+- **Project / storage key** — rename or re-namespace without touching the script tag.
+
+**Try it live:** **<https://onramplab.github.io/quibble/rc.html>**
+
+Or pin the release candidate yourself (defaults match `@v1`, so JSON stays default):
+
+```html
+<script src="https://cdn.jsdelivr.net/gh/OnrampLab/quibble@v1.1.0-rc.1/quibble.js"
+        data-project="my-mockups"></script>
+```
+
 ## Usage
 
 - **Comment on text:** select any text → click **Comment** → type → **Save**.
