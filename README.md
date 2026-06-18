@@ -52,7 +52,7 @@ adds, all persisted in `localStorage`:
 - **Theme** — accent / bar colors and font.
 - **Project / storage key** — rename or re-namespace without touching the script tag.
 
-**Try it live:** **<https://onramplab.github.io/quibble/rc.html>**
+**Try it live:** **<https://onramplab.github.io/quibble/>** — the landing demo links through to the RC page.
 
 Or pin the release candidate yourself (defaults match `@v1`, so JSON stays default):
 
