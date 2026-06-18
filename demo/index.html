@@ -36,10 +36,12 @@
 
     <section>
       <button id="open" class="open-dialog">Open dialog (test quibble in a modal)</button>
+      <button id="fs" class="open-dialog">View photo fullscreen (test fullscreen)</button>
+      <a class="cta" href="head-load.html">Head-load test ↗</a>
     </section>
 
     <section>
-      <div class="hero">PRODUCT PHOTO</div>
+      <div id="hero" class="hero">PRODUCT PHOTO</div>
     </section>
 
     <section>
@@ -72,7 +74,7 @@
        top-layer modal — issue #4. The page content above stays as-is. -->
   <dialog id="demo"
           class="w-full max-w-lg rounded-2xl p-0 shadow-2xl backdrop:bg-slate-900/60 backdrop:backdrop-blur-sm">
-    <div class="p-7">
+    <div class="dialog-content p-7">
       <div class="flex items-start justify-between gap-4">
         <h2 class="text-xl font-bold tracking-tight text-slate-800">Limited release — Single-origin Ethiopia</h2>
         <button data-close aria-label="Close dialog"
@@ -83,7 +85,9 @@
         </button>
       </div>
       <p class="mt-3 text-slate-600">A bright, floral lot we roast in small batches. Select this text to comment,
-        or use Element mode and click the button below — quibble should appear above this modal.</p>
+        or use Element mode and click the button below — quibble should appear above this modal.
+        This dialog closes when you click outside its white panel, so clicking quibble's own bar/panel
+        must <strong>not</strong> close it.</p>
       <a href="#"
          class="mt-5 inline-block rounded-lg bg-emerald-600 px-5 py-2.5 font-semibold text-white hover:bg-emerald-700">
         Add to my subscription
@@ -97,6 +101,22 @@
     var dlg = document.getElementById("demo");
     document.getElementById("open").addEventListener("click", function () { dlg.showModal(); });
     dlg.querySelector("[data-close]").addEventListener("click", function () { dlg.close(); });
+    /* Click-outside-to-close: closes when the click is not inside the white
+       content panel. Without quibble's qbRoot stopPropagation, clicking
+       quibble's own chrome (which sits in the dialog's top layer but outside
+       .dialog-content) would bubble here and wrongly close the modal. */
+    dlg.addEventListener("click", function (e) {
+      if (!e.target.closest(".dialog-content")) dlg.close();
+    });
+
+    /* Fullscreen test: :modal matches a fullscreen element, but entering/exiting
+       fullscreen mutates neither the DOM nor the dialog `open` attribute, so it
+       relies on quibble's fullscreenchange listener to rehome into the element. */
+    document.getElementById("fs").addEventListener("click", function () {
+      var hero = document.getElementById("hero");
+      if (document.fullscreenElement) document.exitFullscreen();
+      else hero.requestFullscreen();
+    });
   </script>
 </body>
 </html>
