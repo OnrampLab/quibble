@@ -1,5 +1,6 @@
 /*! quibble — drop-in text + element commenting layer for AI-assisted iteration.
  *  https://github.com/OnrampLab/quibble  — MIT License.
+ *  version: v1.3.0
  *
  *  ===========================================================================
  *  FOR AI AGENTS: read this header, then add the script tag below to any HTML
@@ -8,7 +9,7 @@
  *
  *  INSTALL — paste this one tag into the page's <body> (or before </body>):
  *
- *    <script src="https://cdn.jsdelivr.net/gh/OnrampLab/quibble@v1/quibble.js"
+ *    <script src="https://cdn.jsdelivr.net/gh/OnrampLab/quibble@latest/quibble.js"
  *            data-project="my-mockups"></script>
  *
  *    Attributes:
